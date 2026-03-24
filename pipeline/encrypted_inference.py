@@ -202,14 +202,24 @@ def run_parameter_sweep(
     spec: ModelSpec,
     store: ArtifactStore,
     configs: list[dict],
+    max_samples: int = 16,
 ) -> list[dict]:
-    """Run batch HE inference across multiple CKKS configs for one model."""
+    """Run batch HE inference across multiple CKKS configs for one model.
+
+    Uses a subset of samples (default 16) to keep sweep fast while still
+    producing representative timing and error statistics.
+    """
     if not TENSEAL_AVAILABLE:
         return []
 
+    # Use a smaller subset for the sweep to reduce total runtime
+    n = min(max_samples, len(X_all))
+    X_sweep = X_all[:n]
+    scores_sweep = plaintext_scores[:n]
+
     sweep_results = []
     for config in configs:
-        result = predict_batch_he(X_all, plaintext_scores, spec, store, config)
+        result = predict_batch_he(X_sweep, scores_sweep, spec, store, config)
         if result["available"]:
             row = {
                 "model_name": spec.name,

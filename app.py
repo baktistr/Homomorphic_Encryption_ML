@@ -214,41 +214,42 @@ def batch():
     )
 
 
-@app.route("/comparison")
-def comparison():
-    if not ARTIFACTS_LOADED:
-        flash("Model artifacts not found. Run fraud_baseline_6d.ipynb first.", "error")
-        return redirect(url_for("index"))
+# ── Comparison cache ───────────────────────────────────────────────────────
+_comparison_cache: dict | None = None
 
-    # Use pre-computed HE eval subset
+
+HE_COMPARISON_SAMPLES = 32  # Limit HE samples to keep page load fast
+
+
+def _build_comparison_data() -> dict:
+    """Compute comparison results once, return cached dict."""
     X_eval = store.he_eval_features
     meta = store.he_eval_meta
-    plaintext_ref = store.he_eval_plaintext
-
-    if X_eval is None or meta is None:
-        flash("HE evaluation subset not found in artifacts.", "error")
-        return redirect(url_for("index"))
-
     labels = meta["isFraud"].values if "isFraud" in meta.columns else None
     models = store.get_all_models()
+
+    # Use full eval set for plaintext, limited subset for HE
+    n_he = min(HE_COMPARISON_SAMPLES, len(X_eval))
 
     comparison_data = []
     sweep_data = []
 
     for name, spec in models.items():
-        # Plaintext
+        # Plaintext on full eval set
         pt_scores = pt.get_batch_scores(X_eval, spec, store)
         pt_labels = pt.get_batch_labels(pt_scores, spec)
         pt_metrics = _compute_metrics(labels, pt_labels, pt_scores) if labels is not None else {}
 
-        # HE batch on primary config
-        he_batch = he.predict_batch_he(X_eval, pt_scores, spec, store, PRIMARY_CKKS_CONFIG)
+        # HE batch on primary config — limited samples
+        he_batch = he.predict_batch_he(
+            X_eval[:n_he], pt_scores[:n_he], spec, store, PRIMARY_CKKS_CONFIG
+        )
 
         he_metrics = {}
         if he_batch["available"] and labels is not None:
             he_scores_arr = np.array([r["decrypted_score"] for r in he_batch["records"]])
             he_labels_arr = pt.get_batch_labels(he_scores_arr, spec)
-            he_metrics = _compute_metrics(labels, he_labels_arr, he_scores_arr)
+            he_metrics = _compute_metrics(labels[:n_he], he_labels_arr, he_scores_arr)
 
         comparison_data.append({
             "model": spec,
@@ -259,13 +260,13 @@ def comparison():
             "he_records": he_batch.get("records", []),
         })
 
-        # Parameter sweep
+        # Parameter sweep — only primary config (already computed above), plus others
         model_sweep = he.run_parameter_sweep(
             X_eval, pt_scores, spec, store, CKKS_PARAMETER_OPTIONS
         )
         sweep_data.extend(model_sweep)
 
-    # Build JSON-safe chart data (no numpy arrays or ModelSpec objects)
+    # Build JSON-safe chart data
     chart_data = []
     for item in comparison_data:
         chart_data.append({
@@ -282,13 +283,42 @@ def comparison():
             "he_records": item["he_records"],
         })
 
+    return {
+        "comparison_data": comparison_data,
+        "chart_data": chart_data,
+        "sweep_data": sweep_data,
+        "n_eval": len(X_eval),
+        "n_fraud": int(labels.sum()) if labels is not None else None,
+    }
+
+
+@app.route("/comparison")
+def comparison():
+    global _comparison_cache
+
+    if not ARTIFACTS_LOADED:
+        flash("Model artifacts not found. Run fraud_baseline_6d.ipynb first.", "error")
+        return redirect(url_for("index"))
+
+    X_eval = store.he_eval_features
+    meta = store.he_eval_meta
+
+    if X_eval is None or meta is None:
+        flash("HE evaluation subset not found in artifacts.", "error")
+        return redirect(url_for("index"))
+
+    # Compute once, serve from cache on subsequent requests
+    if _comparison_cache is None:
+        _comparison_cache = _build_comparison_data()
+
+    c = _comparison_cache
     return render_template(
         "comparison.html",
-        comparison_data=comparison_data,
-        chart_data=chart_data,
-        sweep_data=sweep_data,
-        n_eval=len(X_eval),
-        n_fraud=int(labels.sum()) if labels is not None else None,
+        comparison_data=c["comparison_data"],
+        chart_data=c["chart_data"],
+        sweep_data=c["sweep_data"],
+        n_eval=c["n_eval"],
+        n_fraud=c["n_fraud"],
         tenseal_available=he.is_available(),
         ckks_configs=CKKS_PARAMETER_OPTIONS,
         primary_config=PRIMARY_CKKS_CONFIG,

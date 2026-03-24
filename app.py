@@ -265,9 +265,27 @@ def comparison():
         )
         sweep_data.extend(model_sweep)
 
+    # Build JSON-safe chart data (no numpy arrays or ModelSpec objects)
+    chart_data = []
+    for item in comparison_data:
+        chart_data.append({
+            "model": {
+                "name": item["model"].name,
+                "display_name": item["model"].display_name,
+                "representation": item["model"].representation,
+                "input_dimension": item["model"].input_dimension,
+            },
+            "pt_metrics": item["pt_metrics"],
+            "he_metrics": item["he_metrics"],
+            "he_timing": item["he_timing"],
+            "he_available": item["he_available"],
+            "he_records": item["he_records"],
+        })
+
     return render_template(
         "comparison.html",
         comparison_data=comparison_data,
+        chart_data=chart_data,
         sweep_data=sweep_data,
         n_eval=len(X_eval),
         n_fraud=int(labels.sum()) if labels is not None else None,

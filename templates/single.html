@@ -191,5 +191,11 @@ function fillExample(type) {
         document.getElementById('newbalanceDest').value = '525000.0';
     }
 }
+
+document.querySelector('.transaction-form').addEventListener('submit', function() {
+    const btn = this.querySelector('.btn-primary');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Running Inference...';
+});
 </script>
 {% endblock %}

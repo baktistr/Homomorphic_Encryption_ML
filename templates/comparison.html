@@ -172,7 +172,7 @@
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <script>
     // Pass data to chart rendering functions
-    const comparisonData = {{ comparison_data | tojson(indent=2) if comparison_data else '[]' }};
+    const comparisonData = {{ chart_data | tojson(indent=2) if chart_data else '[]' }};
     const sweepData = {{ sweep_data | tojson(indent=2) if sweep_data else '[]' }};
 
     document.addEventListener('DOMContentLoaded', function() {

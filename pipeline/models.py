@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import pickle
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -66,6 +67,11 @@ class ArtifactStore:
                 f"Artifacts not found at {SCALER_PATH.parent}. "
                 "Run fraud_baseline_6d.ipynb first to generate them."
             )
+
+        # Suppress sklearn version mismatch warnings during unpickling
+        warnings.filterwarnings(
+            "ignore", category=UserWarning, module="sklearn"
+        )
 
         # Feature order
         with FEATURE_ORDER_PATH.open() as f:

@@ -16,9 +16,9 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 SCALER_PATH = ARTIFACT_DIR / "baseline_6d_scaler.pkl"
 RIDGE_PATH = ARTIFACT_DIR / "baseline_6d_ridge.pkl"
 LOGREG_PATH = ARTIFACT_DIR / "baseline_6d_logreg.pkl"
-LINEAR_SVC_PATH = ARTIFACT_DIR / "linear_svc_6d.pkl"
-POLY2_LOGREG_PATH = ARTIFACT_DIR / "poly2_logreg_6d.pkl"
-POLY2_TRANSFORMER_PATH = ARTIFACT_DIR / "poly2_transformer_6d.pkl"
+LINEAR_SVC_PATH = ARTIFACT_DIR / "linear_svc_model.pkl"
+POLY2_LOGREG_PATH = ARTIFACT_DIR / "poly2_logreg_model.pkl"
+POLY2_TRANSFORMER_PATH = ARTIFACT_DIR / "poly2_transformer.pkl"
 FEATURE_ORDER_PATH = ARTIFACT_DIR / "feature_order_6d.json"
 BASELINE_COMPARISON_PATH = ARTIFACT_DIR / "baseline_model_comparison_summary.json"
 

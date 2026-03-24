@@ -141,5 +141,11 @@ if (dropZone) {
         }
     });
 }
+
+document.querySelector('.upload-form').addEventListener('submit', function() {
+    const btn = this.querySelector('.btn-primary');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Processing CSV...';
+});
 </script>
 {% endblock %}

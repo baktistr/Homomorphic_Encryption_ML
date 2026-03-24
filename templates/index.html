@@ -21,27 +21,8 @@
 <section class="card">
     <div class="card-header">How It Works</div>
     <div class="card-body">
-        <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="text-align: center;">
             <img src="{{ url_for('static', filename='img/workflow.svg') }}" alt="HE Workflow: Client encrypts, Server computes on ciphertext, Client decrypts" style="max-width: 100%; height: auto;">
-        </div>
-        <div class="workflow">
-            <div class="workflow-step workflow-client">
-                <div class="workflow-icon">&#x1F513;</div>
-                <h3>Client — Encrypt</h3>
-                <p>Transaction features are converted to a 6D vector and encrypted locally using CKKS. The secret key never leaves the client.</p>
-            </div>
-            <div class="workflow-arrow">&rarr;</div>
-            <div class="workflow-step workflow-server">
-                <div class="workflow-icon">&#x1F512;</div>
-                <h3>Server — Compute</h3>
-                <p>The server computes <code>X &middot; w + b</code> directly on the encrypted vector. It never sees plaintext features or scores.</p>
-            </div>
-            <div class="workflow-arrow">&rarr;</div>
-            <div class="workflow-step workflow-client">
-                <div class="workflow-icon">&#x1F513;</div>
-                <h3>Client — Decrypt</h3>
-                <p>The encrypted fraud score is returned and decrypted locally. The final fraud/not-fraud decision is made client-side.</p>
-            </div>
         </div>
     </div>
 </section>

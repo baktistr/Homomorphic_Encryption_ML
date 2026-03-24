@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Pipeline Comparison — HE Fraud Detection{% endblock %}
+
+{% block content %}
+<h2>Pipeline Comparison Dashboard</h2>
+<p class="text-muted">Pre-computed results on the HE evaluation subset ({{ n_eval }} samples, {{ n_fraud }} fraud). Normal vs CKKS-encrypted inference across all four models.</p>
+
+{% if not tenseal_available %}
+<div class="alert alert-warning">
+    TenSEAL is not installed. Encrypted results are unavailable. Install with: <code>pip install tenseal</code>
+</div>
+{% endif %}
+
+<!-- Section 1: Accuracy comparison -->
+<section class="card">
+    <div class="card-header">Model Accuracy Comparison</div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Pipeline</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>F1</th>
+                    <th>PR-AUC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in comparison_data %}
+                <tr>
+                    <td rowspan="2">{{ item.model.display_name }}</td>
+                    <td><span class="badge badge-normal">Normal</span></td>
+                    <td class="text-mono">{{ "%.4f" | format(item.pt_metrics.precision) if item.pt_metrics else '—' }}</td>
+                    <td class="text-mono">{{ "%.4f" | format(item.pt_metrics.recall) if item.pt_metrics else '—' }}</td>
+                    <td class="text-mono">{{ "%.4f" | format(item.pt_metrics.f1) if item.pt_metrics else '—' }}</td>
+                    <td class="text-mono">{{ "%.4f" | format(item.pt_metrics.pr_auc) if item.pt_metrics else '—' }}</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-he">HE</span></td>
+                    <td class="text-mono">{{ "%.4f" | format(item.he_metrics.precision) if item.he_metrics else '—' }}</td>
+                    <td class="text-mono">{{ "%.4f" | format(item.he_metrics.recall) if item.he_metrics else '—' }}</td>
+                    <td class="text-mono">{{ "%.4f" | format(item.he_metrics.f1) if item.he_metrics else '—' }}</td>
+                    <td class="text-mono">{{ "%.4f" | format(item.he_metrics.pr_auc) if item.he_metrics else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <canvas id="metricsChart" height="100"></canvas>
+    </div>
+</section>
+
+<!-- Section 2: Latency breakdown -->
+<section class="card">
+    <div class="card-header">Latency Breakdown ({{ primary_config.name }})</div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Avg Encrypt (ms)</th>
+                    <th>Avg Infer (ms)</th>
+                    <th>Avg Decrypt (ms)</th>
+                    <th>Avg Total HE (ms)</th>
+                    <th>Ciphertext (KB)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in comparison_data %}
+                {% if item.he_available %}
+                <tr>
+                    <td>{{ item.model.display_name }}</td>
+                    <td class="text-mono">{{ "%.2f" | format(item.he_timing.avg_encrypt_ms) }}</td>
+                    <td class="text-mono">{{ "%.2f" | format(item.he_timing.avg_infer_ms) }}</td>
+                    <td class="text-mono">{{ "%.2f" | format(item.he_timing.avg_decrypt_ms) }}</td>
+                    <td class="text-mono">{{ "%.2f" | format(item.he_timing.avg_total_ms) }}</td>
+                    <td class="text-mono">{{ item.he_timing.avg_ciphertext_kb }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        <canvas id="latencyChart" height="100"></canvas>
+    </div>
+</section>
+
+<!-- Section 3: Numerical error -->
+<section class="card">
+    <div class="card-header">Numerical Error Analysis</div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Mean |Error|</th>
+                    <th>Median |Error|</th>
+                    <th>Max |Error|</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in comparison_data %}
+                {% if item.he_available %}
+                <tr>
+                    <td>{{ item.model.display_name }}</td>
+                    <td class="text-mono">{{ "%.2e" | format(item.he_timing.mean_abs_error) }}</td>
+                    <td class="text-mono">{{ "%.2e" | format(item.he_timing.median_abs_error) }}</td>
+                    <td class="text-mono">{{ "%.2e" | format(item.he_timing.max_abs_error) }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        <canvas id="errorChart" height="100"></canvas>
+    </div>
+</section>
+
+<!-- Section 4: CKKS parameter sweep -->
+{% if sweep_data %}
+<section class="card">
+    <div class="card-header">CKKS Parameter Sweep</div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Config</th>
+                    <th>Poly Degree</th>
+                    <th>Avg Total (ms)</th>
+                    <th>Mean |Error|</th>
+                    <th>Ciphertext (KB)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in sweep_data %}
+                <tr>
+                    <td>{{ row.display_name }}</td>
+                    <td class="text-mono">{{ row.config_name }}</td>
+                    <td class="text-mono">{{ row.poly_modulus_degree }}</td>
+                    <td class="text-mono">{{ "%.2f" | format(row.avg_total_ms) }}</td>
+                    <td class="text-mono">{{ "%.2e" | format(row.mean_abs_error) }}</td>
+                    <td class="text-mono">{{ row.avg_ciphertext_kb }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <canvas id="sweepChart" height="120"></canvas>
+    </div>
+</section>
+{% endif %}
+
+<!-- Section 5: Privacy summary -->
+<section class="card">
+    <div class="card-header">Privacy Summary</div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr><th>Data Element</th><th>Client Sees</th><th>Server Sees</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Transaction Features</td><td class="text-mono">Plaintext</td><td class="text-mono">Ciphertext only</td></tr>
+                <tr><td>Model Weights</td><td class="text-mono">Plaintext</td><td class="text-mono">Plaintext (public)</td></tr>
+                <tr><td>Fraud Score</td><td class="text-mono">Decrypted</td><td class="text-mono">Ciphertext only</td></tr>
+                <tr><td>Fraud Label</td><td class="text-mono">Computed locally</td><td class="text-mono">Never exposed</td></tr>
+                <tr><td>Secret Key</td><td class="text-mono">Held locally</td><td class="text-mono">Never sent</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+    // Pass data to chart rendering functions
+    const comparisonData = {{ comparison_data | tojson(indent=2) if comparison_data else '[]' }};
+    const sweepData = {{ sweep_data | tojson(indent=2) if sweep_data else '[]' }};
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (comparisonData.length > 0) {
+            renderMetricsChart('metricsChart', comparisonData);
+            renderLatencyChart('latencyChart', comparisonData);
+            renderErrorChart('errorChart', comparisonData);
+        }
+        if (sweepData.length > 0) {
+            renderSweepChart('sweepChart', sweepData);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}HE Fraud Detection — Home{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>Privacy-Preserving Fraud Detection</h1>
+    <p class="hero-subtitle">Compare normal ML inference with Homomorphic Encryption (CKKS) across four models — data stays encrypted throughout server-side computation.</p>
+</section>
+
+<!-- Status badges -->
+<div class="status-bar">
+    <span class="status-badge {% if artifacts_loaded %}status-ok{% else %}status-err{% endif %}">
+        {% if artifacts_loaded %}Artifacts Loaded{% else %}Artifacts Missing{% endif %}
+    </span>
+    <span class="status-badge {% if tenseal_available %}status-ok{% else %}status-warn{% endif %}">
+        {% if tenseal_available %}TenSEAL Ready{% else %}TenSEAL Not Installed{% endif %}
+    </span>
+</div>
+
+<!-- Workflow diagram -->
+<section class="card">
+    <div class="card-header">How It Works</div>
+    <div class="card-body">
+        <div class="workflow">
+            <div class="workflow-step workflow-client">
+                <div class="workflow-icon">&#x1F513;</div>
+                <h3>Client — Encrypt</h3>
+                <p>Transaction features are converted to a 6D vector and encrypted locally using CKKS. The secret key never leaves the client.</p>
+            </div>
+            <div class="workflow-arrow">&rarr;</div>
+            <div class="workflow-step workflow-server">
+                <div class="workflow-icon">&#x1F512;</div>
+                <h3>Server — Compute</h3>
+                <p>The server computes <code>X &middot; w + b</code> directly on the encrypted vector. It never sees plaintext features or scores.</p>
+            </div>
+            <div class="workflow-arrow">&rarr;</div>
+            <div class="workflow-step workflow-client">
+                <div class="workflow-icon">&#x1F513;</div>
+                <h3>Client — Decrypt</h3>
+                <p>The encrypted fraud score is returned and decrypted locally. The final fraud/not-fraud decision is made client-side.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Models overview -->
+<section class="card">
+    <div class="card-header">Models</div>
+    <div class="card-body">
+        <div class="model-grid">
+            <div class="model-card">
+                <h4>Ridge Score</h4>
+                <span class="tag">6D input</span>
+                <p>Weighted sum baseline. Low HE cost — single dot product on 6 encrypted features.</p>
+            </div>
+            <div class="model-card">
+                <h4>Logistic Regression</h4>
+                <span class="tag">6D input</span>
+                <p>Logistic scoring with sigmoid applied after decryption. Same HE cost as Ridge.</p>
+            </div>
+            <div class="model-card">
+                <h4>Linear SVC</h4>
+                <span class="tag">6D input</span>
+                <p>Support vector classifier decision function. Identical HE structure to Ridge/LogReg.</p>
+            </div>
+            <div class="model-card">
+                <h4>Poly2 Logistic Regression</h4>
+                <span class="tag">27D input</span>
+                <p>Degree-2 polynomial expansion of 6D features (27 terms). Higher HE cost due to larger vector.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quick links -->
+<section class="card-grid">
+    <a href="{{ url_for('single') }}" class="link-card">
+        <h3>Single Transaction</h3>
+        <p>Enter one transaction and see side-by-side normal vs encrypted inference for all four models.</p>
+    </a>
+    <a href="{{ url_for('batch') }}" class="link-card">
+        <h3>Batch Upload</h3>
+        <p>Upload a CSV of transactions. Get aggregated metrics, timing, and comparison for both pipelines.</p>
+    </a>
+    <a href="{{ url_for('comparison') }}" class="link-card">
+        <h3>Pipeline Comparison</h3>
+        <p>Pre-computed dashboard with charts: accuracy, latency, error distribution, CKKS parameter sweep.</p>
+    </a>
+</section>
+{% endblock %}

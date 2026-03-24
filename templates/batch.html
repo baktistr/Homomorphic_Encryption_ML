@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Batch Upload — HE Fraud Detection{% endblock %}
+
+{% block content %}
+<h2>Batch CSV Upload</h2>
+<p class="text-muted">Upload a CSV with transaction data to run both pipelines on all rows.</p>
+
+{% if errors %}
+<div class="alert alert-error">
+    <ul>
+    {% for e in errors %}
+        <li>{{ e }}</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- Upload form -->
+<section class="card">
+    <div class="card-header">Upload Transaction CSV</div>
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data" class="upload-form">
+            <div class="upload-zone" id="dropZone">
+                <p>Drag &amp; drop a CSV file here, or click to browse</p>
+                <input type="file" name="csvfile" id="csvfile" accept=".csv" required>
+            </div>
+            <p class="text-muted" style="margin-top: 0.5rem;">
+                Required columns: <code>type, amount, oldbalanceOrg, newbalanceOrig, oldbalanceDest, newbalanceDest</code><br>
+                Optional: <code>isFraud</code> (for metric computation). Max {{ config.MAX_UPLOAD_SIZE_MB if config else 5 }}MB.
+            </p>
+            <button type="submit" class="btn btn-primary">Process</button>
+        </form>
+    </div>
+</section>
+
+{% if summary %}
+<!-- Summary -->
+<section class="card">
+    <div class="card-header">Dataset Summary</div>
+    <div class="card-body">
+        <div class="metric-cards">
+            <div class="metric-card-small">
+                <span class="metric-number text-mono">{{ summary.n_rows }}</span>
+                <span class="metric-label">Rows Processed</span>
+            </div>
+            {% if summary.has_labels %}
+            <div class="metric-card-small">
+                <span class="metric-number text-mono">{{ summary.n_fraud }}</span>
+                <span class="metric-label">Fraud</span>
+            </div>
+            <div class="metric-card-small">
+                <span class="metric-number text-mono">{{ summary.n_legit }}</span>
+                <span class="metric-label">Legitimate</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% if results %}
+<!-- Per-model results -->
+{% for r in results %}
+<section class="card">
+    <div class="card-header">{{ r.model.display_name }}
+        <span class="tag">{{ r.model.representation }}</span>
+    </div>
+    <div class="card-body">
+        <div class="pipeline-grid">
+            <!-- Normal -->
+            <div class="pipeline-card pipeline-normal">
+                <div class="pipeline-label">&#x1F513; Normal Pipeline</div>
+                {% if r.pt_metrics %}
+                <table class="metrics-table">
+                    <tr><td>Precision</td><td class="text-mono">{{ "%.4f" | format(r.pt_metrics.precision) }}</td></tr>
+                    <tr><td>Recall</td><td class="text-mono">{{ "%.4f" | format(r.pt_metrics.recall) }}</td></tr>
+                    <tr><td>F1</td><td class="text-mono">{{ "%.4f" | format(r.pt_metrics.f1) }}</td></tr>
+                    <tr><td>PR-AUC</td><td class="text-mono">{{ "%.4f" | format(r.pt_metrics.pr_auc) }}</td></tr>
+                    <tr><td>Predicted Positive</td><td class="text-mono">{{ r.pt_metrics.predicted_positive }}</td></tr>
+                </table>
+                {% else %}
+                <p class="text-muted">No ground truth labels (isFraud column) in CSV.</p>
+                {% endif %}
+            </div>
+
+            <!-- HE -->
+            <div class="pipeline-card pipeline-he">
+                <div class="pipeline-label">&#x1F512; HE Pipeline (CKKS)</div>
+                {% if r.he_available %}
+                    {% if r.he_metrics %}
+                    <table class="metrics-table">
+                        <tr><td>Precision</td><td class="text-mono">{{ "%.4f" | format(r.he_metrics.precision) }}</td></tr>
+                        <tr><td>Recall</td><td class="text-mono">{{ "%.4f" | format(r.he_metrics.recall) }}</td></tr>
+                        <tr><td>F1</td><td class="text-mono">{{ "%.4f" | format(r.he_metrics.f1) }}</td></tr>
+                        <tr><td>PR-AUC</td><td class="text-mono">{{ "%.4f" | format(r.he_metrics.pr_auc) }}</td></tr>
+                        <tr><td>Predicted Positive</td><td class="text-mono">{{ r.he_metrics.predicted_positive }}</td></tr>
+                    </table>
+                    {% endif %}
+                    <h4 style="margin-top: 1rem;">Timing ({{ ckks_config.name }})</h4>
+                    <table class="metrics-table">
+                        <tr><td>Avg Encrypt</td><td class="text-mono">{{ "%.2f" | format(r.he_timing.avg_encrypt_ms) }} ms</td></tr>
+                        <tr><td>Avg Infer</td><td class="text-mono">{{ "%.2f" | format(r.he_timing.avg_infer_ms) }} ms</td></tr>
+                        <tr><td>Avg Decrypt</td><td class="text-mono">{{ "%.2f" | format(r.he_timing.avg_decrypt_ms) }} ms</td></tr>
+                        <tr><td>Avg Total HE</td><td class="text-mono">{{ "%.2f" | format(r.he_timing.avg_total_ms) }} ms</td></tr>
+                        <tr><td>Mean |Error|</td><td class="text-mono">{{ "%.2e" | format(r.he_timing.mean_abs_error) }}</td></tr>
+                        <tr><td>Max |Error|</td><td class="text-mono">{{ "%.2e" | format(r.he_timing.max_abs_error) }}</td></tr>
+                        <tr><td>Avg Ciphertext</td><td class="text-mono">{{ r.he_timing.avg_ciphertext_kb }} KB</td></tr>
+                    </table>
+                {% else %}
+                    <p class="text-muted">TenSEAL not installed. Install with: <code>pip install tenseal</code></p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Drag & drop enhancement
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('csvfile');
+
+if (dropZone) {
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            dropZone.querySelector('p').textContent = e.dataTransfer.files[0].name;
+        }
+    });
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) {
+            dropZone.querySelector('p').textContent = fileInput.files[0].name;
+        }
+    });
+}
+</script>
+{% endblock %}

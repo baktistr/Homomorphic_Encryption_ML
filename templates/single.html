@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Single Transaction — HE Fraud Detection{% endblock %}
+
+{% block content %}
+<h2>Single Transaction Inference</h2>
+<p class="text-muted">Enter a transaction to see side-by-side normal vs HE-encrypted inference for all four models.</p>
+
+{% if errors %}
+<div class="alert alert-error">
+    <ul>
+    {% for e in errors %}
+        <li>{{ e }}</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- Input form -->
+<section class="card">
+    <div class="card-header">Transaction Input</div>
+    <div class="card-body">
+        <form method="POST" class="transaction-form">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="type">Transaction Type</label>
+                    <select name="type" id="type" required>
+                        <option value="TRANSFER" {% if raw_input and raw_input.type == 'TRANSFER' %}selected{% endif %}>TRANSFER</option>
+                        <option value="CASH_OUT" {% if raw_input and raw_input.type == 'CASH_OUT' %}selected{% endif %}>CASH_OUT</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="amount">Amount</label>
+                    <input type="number" step="any" name="amount" id="amount" required
+                           value="{{ raw_input.amount if raw_input else '' }}" placeholder="e.g. 181000">
+                </div>
+                <div class="form-group">
+                    <label for="oldbalanceOrg">Old Balance (Origin)</label>
+                    <input type="number" step="any" name="oldbalanceOrg" id="oldbalanceOrg" required
+                           value="{{ raw_input.oldbalanceOrg if raw_input else '' }}" placeholder="e.g. 181000">
+                </div>
+                <div class="form-group">
+                    <label for="newbalanceOrig">New Balance (Origin)</label>
+                    <input type="number" step="any" name="newbalanceOrig" id="newbalanceOrig" required
+                           value="{{ raw_input.newbalanceOrig if raw_input else '' }}" placeholder="e.g. 0">
+                </div>
+                <div class="form-group">
+                    <label for="oldbalanceDest">Old Balance (Dest)</label>
+                    <input type="number" step="any" name="oldbalanceDest" id="oldbalanceDest" required
+                           value="{{ raw_input.oldbalanceDest if raw_input else '' }}" placeholder="e.g. 0">
+                </div>
+                <div class="form-group">
+                    <label for="newbalanceDest">New Balance (Dest)</label>
+                    <input type="number" step="any" name="newbalanceDest" id="newbalanceDest" required
+                           value="{{ raw_input.newbalanceDest if raw_input else '' }}" placeholder="e.g. 0">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Run Inference</button>
+                <button type="button" class="btn btn-secondary" onclick="fillExample('fraud')">Fill Fraud Example</button>
+                <button type="button" class="btn btn-secondary" onclick="fillExample('legit')">Fill Legit Example</button>
+            </div>
+        </form>
+    </div>
+</section>
+
+{% if feature_vector %}
+<!-- Feature vector display -->
+<section class="card">
+    <div class="card-header">Scaled Feature Vector (6D)</div>
+    <div class="card-body">
+        <div class="feature-vector">
+            {% for name, val in feature_vector.items() %}
+            <div class="feature-item">
+                <span class="feature-name">{{ name }}</span>
+                <span class="feature-value text-mono">{{ "%.6f" | format(val) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% if results %}
+<!-- Results: side-by-side for each model -->
+{% for r in results %}
+<section class="card">
+    <div class="card-header">{{ r.model.display_name }}
+        <span class="tag">{{ r.model.representation }} ({{ r.model.input_dimension }}D)</span>
+    </div>
+    <div class="card-body">
+        <div class="pipeline-grid">
+            <!-- Normal pipeline -->
+            <div class="pipeline-card pipeline-normal">
+                <div class="pipeline-label">&#x1F513; Normal Pipeline</div>
+                <div class="pipeline-result">
+                    <div class="metric-row">
+                        <span class="metric-label">Score</span>
+                        <span class="metric-value text-mono">{{ "%.6f" | format(r.plaintext.score) }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Label</span>
+                        <span class="badge {% if r.plaintext.label == 1 %}badge-fraud{% else %}badge-safe{% endif %}">
+                            {{ r.plaintext.label_text }}
+                        </span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Time</span>
+                        <span class="metric-value text-mono">{{ "%.3f" | format(r.plaintext.time_ms) }} ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HE pipeline -->
+            <div class="pipeline-card pipeline-he">
+                <div class="pipeline-label">&#x1F512; HE Pipeline (CKKS)</div>
+                {% if r.encrypted.get('available', true) != false %}
+                <div class="pipeline-result">
+                    <div class="metric-row">
+                        <span class="metric-label">Score</span>
+                        <span class="metric-value text-mono">{{ "%.6f" | format(r.encrypted.decrypted_score) }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Label</span>
+                        <span class="badge {% if r.encrypted.label == 1 %}badge-fraud{% else %}badge-safe{% endif %}">
+                            {{ r.encrypted.label_text }}
+                        </span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Encrypt</span>
+                        <span class="metric-value text-mono">{{ "%.2f" | format(r.encrypted.encrypt_ms) }} ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Infer</span>
+                        <span class="metric-value text-mono">{{ "%.2f" | format(r.encrypted.infer_ms) }} ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Decrypt</span>
+                        <span class="metric-value text-mono">{{ "%.2f" | format(r.encrypted.decrypt_ms) }} ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Total HE</span>
+                        <span class="metric-value text-mono">{{ "%.2f" | format(r.encrypted.total_he_ms) }} ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Ciphertext</span>
+                        <span class="metric-value text-mono">{{ r.encrypted.ciphertext_kb }} KB</span>
+                    </div>
+                    {% if r.encrypted.abs_error is not none %}
+                    <div class="metric-row">
+                        <span class="metric-label">Error</span>
+                        <span class="metric-value text-mono">{{ "%.2e" | format(r.encrypted.abs_error) }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="pipeline-result">
+                    <p class="text-muted">{{ r.encrypted.get('message', 'TenSEAL not available') }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endfor %}
+{% endif %}
+
+{% if not tenseal_available %}
+<div class="alert alert-warning">
+    TenSEAL is not installed. HE inference will be skipped. Install with: <code>pip install tenseal</code>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fillExample(type) {
+    if (type === 'fraud') {
+        document.getElementById('type').value = 'TRANSFER';
+        document.getElementById('amount').value = '181000.0';
+        document.getElementById('oldbalanceOrg').value = '181000.0';
+        document.getElementById('newbalanceOrig').value = '0.0';
+        document.getElementById('oldbalanceDest').value = '0.0';
+        document.getElementById('newbalanceDest').value = '0.0';
+    } else {
+        document.getElementById('type').value = 'CASH_OUT';
+        document.getElementById('amount').value = '25000.0';
+        document.getElementById('oldbalanceOrg').value = '150000.0';
+        document.getElementById('newbalanceOrig').value = '125000.0';
+        document.getElementById('oldbalanceDest').value = '500000.0';
+        document.getElementById('newbalanceDest').value = '525000.0';
+    }
+}
+</script>
+{% endblock %}
